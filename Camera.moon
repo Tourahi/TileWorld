@@ -37,7 +37,7 @@ class Camera
     @boundsMinY = 0
     @boundsMaxX = 0
     @boundsMaxY = 0
-    @drawDeadZone = false
+    @drawDeadzone = false
     @flashDuration = 1
     @flashTimer = 0
     @flashColor = {0, 0, 0, 1}
@@ -225,6 +225,34 @@ class Camera
       if @bound
         @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
         @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
+
+
+  draw: =>
+    Graphics = love.graphics
+    if @drawDeadzone and @deadzone
+      n = Graphics.getLineWidth!
+      Graphics.setLineWidth 2
+      Graphics.line @deadzoneX - 1, @deadzoneY, @deadzoneX + 6, @deadzoneY
+      Graphics.line @deadzoneX, @deadzoneY, @deadzoneX, @deadzoneY + 6
+      Graphics.line @deadzoneX - 1, @deadzoneY + @deadzoneH, @deadzoneX + 6, @deadzoneY + @deadzoneH
+      Graphics.line @deadzoneX, @deadzoneY + @deadzoneH, @deadzoneX, @deadzoneY + @deadzoneH - 6
+      Graphics.line @deadzoneX + @deadzoneW + 1, @deadzoneY + @deadzoneH, @deadzoneX + @deadzoneW - 6, @deadzoneY + @deadzoneH
+      Graphics.line @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH, @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH - 6
+      Graphics.line @deadzoneX + @deadzoneW + 1, @deadzoneY, @deadzoneX + @deadzoneW - 6, @deadzoneY
+      Graphics.line @deadzoneX + @deadzoneW, @deadzoneY, @deadzoneX + @deadzoneW, @deadzoneY + 6
+      Graphics.setLineWidth n
+
+    if @flashing
+      r, g, b, a = Graphics.getColor!
+      Graphics.setColor @flashColor
+      Graphics.rectangle 'fill', 0, 0, @w, @h
+      Graphics.setColor r, g, b, a
+
+    r, g, b, a = Graphics.getColor!
+    Graphics.setColor @fadeColor
+    Graphics.rectangle 'fill', 0, 0, @w, @h
+    Graphics.setColor r, g, b, a
+
 
 
 
