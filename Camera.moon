@@ -1,6 +1,10 @@
 Shake = assert require "Shake"
 
 
+-- Utils
+csnap = (v, x) -> math.ceil(v/x) * x - x/2
+lerp = (a, b, x) -> a + (b - a) * x
+
 class Camera
   new: (x, y, w, h, scale, rot) =>
     Graphics = love.graphics
@@ -26,7 +30,7 @@ class Camera
     @followLerpY = 1
     @followLeadX = 0
     @followLeadY = 0
-    @followStyle = 'LOCKON'
+    @followStyle = nil
     @deadzone = nil
     @deadzoneX = 0
     @deadzoneY = 0
@@ -149,7 +153,7 @@ class Camera
       @setDeadzone (@w - w)/2, (@h - h)/2, w, h
     elseif @followStyle == 'PLATFORMER'
       w, h = @w/8, @w/3
-      @setDeadzone (@w - w)/2, (@h - h)/2*0.25, w, h
+      @setDeadzone (@w - w)/2, (@h - h)/2 - h*0.25, w, h
     elseif @followStyle == 'TOPDOWN'
       s = math.max(@w, @h)/4
       @setDeadzone (@w - s)/2, (@h - s)/2, s, s
@@ -183,7 +187,6 @@ class Camera
           @screenY = csnap(@screenY - @h/@scale, @h/@scale)
         if @y < @boundsMaxY - @h/2 and targetY >= @h
           @screenY = csnap(@screenY + @h/@scale, @h/@scale)
-
       else
         if targetX < 0
           @screenX = csnap(@screenX - @w/@scale, @w/@scale)
@@ -201,6 +204,7 @@ class Camera
         @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
         @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
     else
+
       if targetX < x + (dx1 + dx2 - x)
         d = targetX - dx1
         if d < 0 then scrollX = d
@@ -216,12 +220,14 @@ class Camera
 
       if not @lastTargetX and not @lastTargetY
         @lastTargetX, @lastTargetY = @targetX, @targetY
+
       scrollX += (@targetX - @lastTargetX) * @followLeadX
       scrollY += (@targetY - @lastTargetY) * @followLeadY
       @lastTargetX, @lastTargetY = @targetX, @targetY
 
-      @x = lerp(@x, @x + @scrollX, @followLerpX)
-      @y = lerp(@y, @y + @scrollY, @followLerpY)
+      @x = lerp(@x, @x + scrollX, @followLerpX)
+      @y = lerp(@y, @y + scrollY, @followLerpY)
+
       if @bound
         @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
         @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
@@ -253,15 +259,43 @@ class Camera
     Graphics.rectangle 'fill', 0, 0, @w, @h
     Graphics.setColor r, g, b, a
 
+  follow: (x, y) =>
+    @targetX, @targetY = x, y
+
+  setBounds: (x, y, w, h) =>
+    @bound = true
+    @boundsMinX = x
+    @boundsMinY = y
+    @boundsMaxX = x + w
+    @boundsMaxY = y + h
+
+  setFollowStyle: (fs) =>
+    @followStyle = fs
+
+  setFollowLerp: (x, y) =>
+    @followLerpX = x
+    @followLerpY = y or x
+
+  setFollowLead: (x, y) =>
+    @followLeadX = x
+    @followLeadY = y or x
+
+  flash: (dur, color) =>
+    @flashDuration = dur
+    @flashColor = color or @flashColor
+    @flashTimer = 0
+    @flashing = true
 
 
+  fade: (dur, color, action) =>
+    @fadeDur = dur
+    @baseFadeColor = @fadeColor
+    @targetFadeColor = color
+    @fadeTimer = 0
+    @fadeAction = action
+    @fading = true
 
 
-
-
--- Utils
-csnap = (v, x) -> math.ceil(v/x) * x - x/2
-lerp = (a, b, x) -> a + (b - a) * x
 
 
 -- return
