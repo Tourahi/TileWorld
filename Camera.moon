@@ -32,11 +32,16 @@ class Camera
     @flashDuration = 1
     @flashTimer = 0
     @flashColor = {0, 0, 0, 1}
+    @flashing = false
     @lastHoriShakeAmount = 0
     @lastVertiShakeAmount = 0
     @fadeDur = 1
     @fadeTimer = 1
     @fadeColor = {0, 0, 0, 0}
+    @baseFadeColor = {0, 0, 0, 1}
+    @targetFadeColor = {0, 0, 0, 1}
+    @fadeAction = nil
+    @fading = false
 
 
   attach: =>
@@ -79,8 +84,40 @@ class Camera
       table.insert @vertiShakes, Shake(intensity, freq,dur * 1000)
 
   update: (dt) =>
+    @mx, @my = @getMousePosition!
 
+    -- Flash
+    if @flashing
+      @flashTimer = @flashTimer + dt
+      if @flashTimer > @flashDuration
+        @flashTimer = 0
+        @flashing = false
 
+    -- Fade
+    if @fading
+      @fadeTimer = @fadeTimer + dt
+      @fadeColor = {
+        lerp(@baseFadeColor[1], @targetFadeColor[1], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[2], @targetFadeColor[2], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[3], @targetFadeColor[3], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[4], @targetFadeColor[4], @fadeTimer/@fadeDur),
+      }
+      if @fadeTimer > @fadeDur
+        @fadeTimer = 0
+        @fading = false
+        if @fadeAction then @fadeAction!
+
+    -- Shake Horizontal
+    horiShakeAmount, vertiShakeAmount = 0, 0
+    for i = #@horiShakes, 1, -1 do
+      @horiShakes[i]\update dt
+      horiShakeAmount += @horiShakes[i]\getAmplitude!
+      if not @horiShakes[i]\isShaking! then table.remove(@horiShakes, i)
+    -- Shake Vertical
+    for i = #@vertiShakes, 1, -1 do
+      @vertiShakes[i]\update dt
+      vertiShakeAmount += @vertiShakes[i]\getAmplitude!
+      if not @vertiShakes[i]\isShaking! then table.remove(@vertiShakes, i)
 
 
 

@@ -46,4 +46,5 @@ export class Shake
       return 0
     return @samples[s] or 0
 
-
+  isShaking: =>
+    @shaking
