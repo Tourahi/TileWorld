@@ -21,13 +21,22 @@ class Camera
     @scrollX = 0
     @scrollY = 0
     @lastTargetX = nil
-    @lastTargetX = nil
+    @lastTargetY = nil
     @followLerpX = 1
     @followLerpY = 1
     @followLeadX = 0
     @followLeadY = 0
-    @deadZone = nil
+    @followStyle = 'LOCKON'
+    @deadzone = nil
+    @deadzoneX = 0
+    @deadzoneY = 0
+    @deadzoneW = 0
+    @deadzoneH = 0
     @bound = nil
+    @boundsMinX = 0
+    @boundsMinY = 0
+    @boundsMaxX = 0
+    @boundsMaxY = 0
     @drawDeadZone = false
     @flashDuration = 1
     @flashTimer = 0
@@ -42,6 +51,7 @@ class Camera
     @targetFadeColor = {0, 0, 0, 1}
     @fadeAction = nil
     @fading = false
+
 
 
   attach: =>
@@ -83,6 +93,13 @@ class Camera
     if string.find(axes, 'X')
       table.insert @vertiShakes, Shake(intensity, freq,dur * 1000)
 
+  setDeadzone: (x, y, w, h) =>
+    @deadzone = true
+    @deadzoneX = x
+    @deadzoneY = y
+    @deadzoneW = w
+    @deadzoneH = h
+
   update: (dt) =>
     @mx, @my = @getMousePosition!
 
@@ -119,6 +136,95 @@ class Camera
       vertiShakeAmount += @vertiShakes[i]\getAmplitude!
       if not @vertiShakes[i]\isShaking! then table.remove(@vertiShakes, i)
 
+    @x, @y = @x - @lastHoriShakeAmount, @y - @lastVertiShakeAmount
+    @move horiShakeAmount, vertiShakeAmount
+    @lastHoriShakeAmount, @lastVertiShakeAmount = horiShakeAmount, vertiShakeAmount
+
+    -- Follow
+    if not @targetX and not @targetY then return
+
+    -- Set follow Style
+    if @followStyle == 'LOCKON'
+      w, h = @w/16, @w/16
+      @setDeadzone (@w - w)/2, (@h - h)/2, w, h
+    elseif @followStyle == 'PLATFORMER'
+      w, h = @w/8, @w/3
+      @setDeadzone (@w - w)/2, (@h - h)/2*0.25, w, h
+    elseif @followStyle == 'TOPDOWN'
+      s = math.max(@w, @h)/4
+      @setDeadzone (@w - s)/2, (@h - s)/2, s, s
+    elseif @followStyle == 'TOPDOWN_TIGHT'
+      s = math.max(@w, @h)/8
+      @setDeadzone (@w - s)/2, (@h - s)/2, s, s
+    elseif @followStyle == 'SCREEN_BY_SCREEN'
+      @setDeadzone 0, 0, 0, 0
+    elseif @followStyle == 'NO_DEADZONE'
+      @deadzone = nil
+
+    if not @deadzone
+      @x, @y = @targetX, @targetY
+      if @bound
+        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
+        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
+      return
+
+    dx1, dy1, dx2, dy2 = @deadzoneX, @deadzoneY, @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH
+    scrollX, scrollY = 0, 0
+    targetX, targetY = @toCameraCoords @targetX, @targetY
+    x, y = @toCameraCoords @x, @y
+
+    if @followStyle == 'SCREEN_BY_SCREEN'
+      if @bound
+        if @x > @boundsMinX + @w/2 and targetX < 0
+          @screenX = csnap(@screenX - @w/@scale, @w/@scale)
+        if @x < @boundsMaxX - @w/2 and targetX >= @w
+          @screenX = csnap(@screenX + @w/@scale, @w/@scale)
+        if @y > @boundsMinY + @h/2 and targetY < 0
+          @screenY = csnap(@screenY - @h/@scale, @h/@scale)
+        if @y < @boundsMaxY - @h/2 and targetY >= @h
+          @screenY = csnap(@screenY + @h/@scale, @h/@scale)
+
+      else
+        if targetX < 0
+          @screenX = csnap(@screenX - @w/@scale, @w/@scale)
+        if targetX >= @w
+          @screenX = csnap(@screenX + @w/@scale, @w/@scale)
+        if targetY < 0
+          @screenY = csnap(@screenY - @h/@scale, @h/@scale)
+        if targetY >= @h
+          @screenY = csnap(@screenY + @h/@scale, @h/@scale)
+
+      @x = lerp @x, @screenX, @followLerpX
+      @y = lerp @y, @screenY, @followLerpY
+
+      if @bound
+        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
+        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
+    else
+      if targetX < x + (dx1 + dx2 - x)
+        d = targetX - dx1
+        if d < 0 then scrollX = d
+      if targetX > x - (dx1 + dx2 - x)
+        d = targetX - dx2
+        if d > 0 then scrollX = d
+      if targetY < y + (dy1 + dy2 - y)
+        d = targetY - dy1
+        if d < 0 then scrollY = d
+      if targetY > y - (dy1 + dy2 - y)
+        d = targetY - dy2
+        if d > 0 then scrollY = d
+
+      if not @lastTargetX and not @lastTargetY
+        @lastTargetX, @lastTargetY = @targetX, @targetY
+      scrollX += (@targetX - @lastTargetX) * @followLeadX
+      scrollY += (@targetY - @lastTargetY) * @followLeadY
+      @lastTargetX, @lastTargetY = @targetX, @targetY
+
+      @x = lerp(@x, @x + @scrollX, @followLerpX)
+      @y = lerp(@y, @y + @scrollY, @followLerpY)
+      if @bound
+        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
+        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
 
 
 
@@ -130,5 +236,5 @@ csnap = (v, x) -> math.ceil(v/x) * x - x/2
 lerp = (a, b, x) -> a + (b - a) * x
 
 
-
---lerp
+-- return
+Camera
