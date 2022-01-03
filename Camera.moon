@@ -39,6 +39,47 @@ class Camera
     @fadeColor = {0, 0, 0, 0}
 
 
+  attach: =>
+    Graphics = love.graphics
+    Graphics.push!
+    Graphics.translate @w/2, @h/2
+    Graphics.scale @scale
+    Graphics.rotate @rot
+    Graphics.translate -@x, -@y
+
+  detach: =>
+    Graphics = love.graphics
+    Graphics.pop!
+
+  move: (dx, dy) =>
+    @x, @y = @x + dx, @y + dy
+
+  toWorldCoords: (x, y) =>
+    c, s = math.cos(@rot), math.sin(@rot)
+    x, y = (x - @w/2)/@scale, (y - @h/2)/@scale
+    x, y = c*x - s*y, s*x + c*y
+    x + @x, y + @y
+
+  toCameraCoords: (x, y) =>
+    c, s = math.cos(@rot), math.sin(@rot)
+    x, y = x - @x, y - @y
+    x, y = c*x - s*y, s*x + c*y
+    x * @scale + @w/2, y * @scale + @h/2
+
+  getMousePosition: =>
+    m = love.mouse
+    @toWorldCoords m.getPosition!
+
+  shake: (intensity, dur, freq, axes) =>
+    if not axes then axes = 'XY'
+    axes = string.upper axes
+
+    if string.find(axes, 'X')
+      table.insert @horiShakes, Shake(intensity, freq,dur * 1000)
+    if string.find(axes, 'X')
+      table.insert @vertiShakes, Shake(intensity, freq,dur * 1000)
+
+  update: (dt) =>
 
 
 

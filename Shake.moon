@@ -33,7 +33,7 @@ export class Shake
     s0 = math.floor(s)
     s1 = s0 + 1
     k = @decay(t)
-    return @amp*(@noise(s0) + (s - s0)*(@noise(s1) - @noise(s0)))*k
+    @amp*(@noise(s0) + (s - s0)*(@noise(s1) - @noise(s0)))*k
 
 
   decay: (t) =>

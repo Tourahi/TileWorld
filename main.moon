@@ -8,3 +8,4 @@ csnap = (v, x) ->
 with love
   .load = ->
     print csnap(10, 2)
+    print csnap(2, 10)
