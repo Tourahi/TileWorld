@@ -70,8 +70,7 @@ class Camera
     m = love.mouse
     @toWorldCoords m.getPosition!
 
-  shake: (intensity, dur, freq, axes) =>
-    if not axes then axes = 'XY'
+  shake: (intensity, dur, freq, axes = 'XY') =>
     axes = string.upper axes
 
     if string.find(axes, 'X')
