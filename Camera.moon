@@ -14,9 +14,29 @@ class Camera
     @h = h or Graphics.getHeight!
     @scale = scale or 1
     @rot = rot or 0
-
-
-
+    @horiShakes = {}
+    @vertiShakes = {}
+    @targetX = nil
+    @targetY = nil
+    @scrollX = 0
+    @scrollY = 0
+    @lastTargetX = nil
+    @lastTargetX = nil
+    @followLerpX = 1
+    @followLerpY = 1
+    @followLeadX = 0
+    @followLeadY = 0
+    @deadZone = nil
+    @bound = nil
+    @drawDeadZone = false
+    @flashDuration = 1
+    @flashTimer = 0
+    @flashColor = {0, 0, 0, 1}
+    @lastHoriShakeAmount = 0
+    @lastVertiShakeAmount = 0
+    @fadeDur = 1
+    @fadeTimer = 1
+    @fadeColor = {0, 0, 0, 0}
 
 
 
