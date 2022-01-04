@@ -14,7 +14,7 @@ cwd = (...)\gsub('%.Tiler$', '') .. "."
 with love
   .load = ->
     print cwd
-    t = Tiler "tests/map.lua", { "Camera" }
+    t = Tiler "tests/ortho.lua", { "Camera" }
     export input = Input!
     export camera = t.Camera!
     camera\setFollowStyle('LOCKON')
