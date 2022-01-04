@@ -1,16 +1,22 @@
 Camera = assert require "Camera"
 Input = assert require "Input"
 Leak = assert require "Leak"
+Tiler = assert require "Tiler"
 
 rec = {
   x: 10,
   y: 10
 }
 
+cwd = (...)\gsub('%.Tiler$', '') .. "."
+
+
 with love
   .load = ->
+    print cwd
+    t = Tiler "tests/map.lua", { "Camera" }
     export input = Input!
-    export camera = Camera!
+    export camera = t.Camera!
     camera\setFollowStyle('LOCKON')
     camera\setFollowLerp(0.2)
     camera\setFollowLead(0)
