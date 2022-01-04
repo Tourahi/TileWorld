@@ -1,5 +1,6 @@
 Camera = assert require "Camera"
-Input = assert require 'Input'
+Input = assert require "Input"
+Leak = assert require "Leak"
 
 rec = {
   x: 10,
@@ -37,6 +38,8 @@ with love
       rec.y += 10
     if input\pressed 's'
       camera\shake(8, 1, 60)
+    if input\pressed 'l'
+      Leak.report!
     camera\update dt
     camera\follow rec.x, rec.y
 
