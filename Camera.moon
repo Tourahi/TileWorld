@@ -259,6 +259,7 @@ class Camera
     Graphics.rectangle 'fill', 0, 0, @w, @h
     Graphics.setColor r, g, b, a
 
+
   follow: (x, y) =>
     @targetX, @targetY = x, y
 

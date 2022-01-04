@@ -35,6 +35,8 @@ with love
       rec.y -= 10
     if input\down "down"
       rec.y += 10
+    if input\pressed 's'
+      camera\shake(8, 1, 60)
     camera\update dt
     camera\follow rec.x, rec.y
 

@@ -4,7 +4,7 @@ random = (min, max) ->
     min, max = min or 0, max or 1
     return (min > max and (love.math.random()*(min - max) + max)) or (love.math.random()*(max - min) + min)
 
-export class Shake
+class Shake
   new: (amp, freq, dur)=>
     @amp = amp
     @freq = freq
@@ -48,3 +48,6 @@ export class Shake
 
   isShaking: =>
     @shaking
+
+
+Shake
