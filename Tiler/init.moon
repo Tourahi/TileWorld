@@ -70,6 +70,7 @@ class Tiler
     @cache = {}
     @freeBatchSprites = {}
     setmetatable @freeBatchSprites, { __mode: 'k' }
+    @layers = {}
 
     gid = 1
     for i, tileset in ipairs @tilesets
@@ -78,14 +79,88 @@ class Tiler
         formattedPath = formatPath(@dir .. tileset.image)
 
         if not @cache[formattedPath]
-          -- FIX TRASPARENT COLOR
           @fixTransparentColor tileset, formattedPath
-          @cacheImage formattedPath
+          @cacheImage formattedPath, tileset.image -- TODO: formattedPath no needed ??
         else
           tileset.image = @cache[formattedPath]
       -- SetTiles
+      gid = @setTiles i, tileset, gid
+
+    layers = {}
+    for _, layer in ipairs @layers
+      @groupAppendToList layers, layer
+
+    @layers = layers
+
+    for _, layer in ipairs @layers
+      @setLayer layer, path
 
 
+  setLayer: (layer, path) =>
+    Data = love.data
+    if layer.encoding
+      if layer.encoding == "base64"
+        assert(require "ffi", "Compressed maps require LuaJIT FFI.\nPlease Switch your interperator to LuaJIT or your Tile Layer Format to \"CSV\".")
+        fd = Data.decode "string", "base64", layer.data
+
+        if not layer.compression
+          layer.data = @getDecompresedData fd
+        else
+          assert(Data.decompress, "zlib and gzip compression require LOVE 11.0+.\nPlease set your Tile Layer Format to \"Base64 (uncompressed)\" or \"CSV\".")
+
+          if layer.compression == "zlib"
+            data = Data.decompress "string", "zlib", fd
+            layer.data = @getDecompresedData data
+
+          if layer.compression == "gzip"
+            data = Data.decompress "string", "gzip", fd
+            layer.data = @getDecompresedData data
+
+    layer.x = (layer.x or 0) + layer.offsetx + @offsetX
+    layer.y = (layer.y or 0) + layer.offsety + @offsetY
+
+    layer.update = ->
+
+    if layer.type == "tilelayer"
+      @setTileData layer
+
+
+
+  setTileData: (layer) =>
+    if layer.chunks
+      for _, chunk in ipairs layer.chunks
+        @setTileData chunk
+      return
+
+    i = 1
+    map = {}
+
+    for y = 1, layer.height
+      map[y] = {}
+      for x = 1, layer.width
+        gid = layer.data[i]
+
+        if gid > 0
+          map[y][x] = @tiles[gid] or @setFlippedGID(gid)
+
+        i += 1
+    layer.data = map
+
+  groupAppendToList: (layers, layer) =>
+    if layer.type == "group"
+      for _, groupLayer in pairs layer.layers
+        groupLayer.name = layer.name .. "." .. groupLayer.name
+        groupLayer.visible = layer.visible
+        groupLayer.opacity = layer.opacity * groupLayer.opacity
+        groupLayer.offsetx = layer.offsetx + groupLayer.offsetx
+        groupLayer.offsety = layer.offsety + groupLayer.offsety
+
+        for key, property in pairs layer.properties
+          if groupLayer.properties[key] == nil
+            groupLayer.properties[key] = property
+        @groupAppendToList layers, groupLayer
+    else
+      table.insert layers, layer
 
   pixelFunc: (_, _, r, g, b, a) ->
     mask = TRANSPARENT_COLOR
@@ -130,3 +205,145 @@ class Tiler
       -- canvas creation
       @canvas = Graphics.newCanvas w, h
       @canvas\setFilter "nearest", "nearest"
+
+  getTiles: (imgW, tileW, margin, spacing) =>
+    imgW -= margin
+    n = 0
+
+    while imgW >= tileW
+      imgW -= tileW
+      if n ~= 0 then imgW -= spacing
+      if imgW >= 0 then n += 1
+    n
+
+  setTiles: (idx, tileset, gid) =>
+    quad = Graphics.newQuad
+    imgW = tileset.imagewidth
+    imgH = tileset.imageheight
+    tileW = tileset.tilewidth
+    tileH = tileset.tileheight
+    margin = tileset.margin
+    spacing = tileset.spacing
+    w = @getTiles imgW, tileW, margin, spacing -- Number of tiles Horizontal
+    h = @getTiles imgH, tileH, margin, spacing -- Number of tiles Vertical
+
+    for y = 1, h
+      for x = 1, w
+        id = gid - tileset.firstgid
+        quadX = (x - 1) * tileW + margin + (x - 1) * spacing
+        quadY = (y - 1) * tileH + margin + (y - 1) * spacing
+        type = ""
+        properties, terrain, animation, objectGroup
+
+        for _, tile in pairs tileset.tiles
+          if tile.id == id
+            properties = tile.properties
+            animation = tile.animation
+            objectGroup = tile.objectGroup
+            type = tile.type
+
+            if tile.terrain
+              terrain = {}
+              for i = 1, #tile.terrain
+                terrain[i] = tileset.terrains[tile.terrain[i] + 1]
+
+        tile = {
+          id: id
+          gid: gid
+          tileset: idx
+          type: type
+          quad: quad(quadX, quadY, tileW, tileH, imgW, imgH)
+          properties: properties or {}
+          terrain: terrain
+          animation: animation
+          objectGroup: objectGroup
+          frame: 1
+          time: 0
+          width: tileW
+          height: tileH
+          sx: 1
+          sy: 1
+          r: 0
+          offset: tileset.tileoffset
+        }
+
+        @tiles[gid] = tile
+        gid += 1
+    gid
+
+  getDecompresedData: (data) =>
+    ffi = require "ffi"
+    d = {}
+    decoded = ffi.cast "uint32_t*", data
+
+    for i = 0, data\len! / ffi.sizeof "uint32_t"
+      table.insert d, tonumber(decoded[i])
+    d
+
+  setFlippedGID: (gid) =>
+    bit31   = 2147483648
+    bit30   = 1073741824
+    bit29   = 536870912
+    flipX   = false
+    flipY   = false
+    flipD   = false
+    realgid = gid
+
+    if realgid >= bit31
+      realgid -= bit31
+      flipX = not flipX
+
+    if realgid >= bit30
+      realgid -= bit30
+      flipY = not flipY
+
+    if realgid >= bit29
+      realgid -= bit29
+      flipD = not flipD
+
+    tile = @tiles[realgid]
+    data = {
+      id: tile.id,
+      gid: gid,
+      tileset: tile.tileset,
+      frame: tile.frame,
+      time: tile.time,
+      width: tile.width,
+      height: tile.height,
+      offset: tile.offset,
+      quad: tile.quad,
+      properties: tile.properties,
+      terrain: tile.terrain,
+      animation: tile.animation,
+      sx: tile.sx,
+      sy: tile.sy,
+      r: tile.r,
+    }
+
+    if flipX
+      if flipY and flipD
+        data.r  = math.rad(-90)
+        data.sy = -1
+      elseif flipY
+        data.sx = -1
+        data.sy = -1
+      elseif flipD
+        data.r = math.rad(90)
+      else
+        data.sx = -1
+    elseif flipY
+      if flipD
+        data.r = math.rad(-90)
+      else
+        data.sy = -1
+    elseif flipD
+      data.r  = math.rad(90)
+      data.sy = -1
+
+    @tiles[gid] = data
+    @tiles[gid]
+
+
+
+
+

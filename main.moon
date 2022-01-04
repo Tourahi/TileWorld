@@ -2,6 +2,8 @@ Camera = assert require "Camera"
 Input = assert require "Input"
 Leak = assert require "Leak"
 Tiler = assert require "Tiler"
+M = assert require 'moon'
+export Dump = M.p
 
 rec = {
   x: 10,
