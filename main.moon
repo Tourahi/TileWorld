@@ -1,6 +1,7 @@
 Camera = assert require "Camera"
 Input = assert require "Input"
 Leak = assert require "Leak"
+
 Tiler = assert require "Tiler"
 M = assert require 'moon'
 export Dump = M.p
@@ -16,12 +17,19 @@ cwd = (...)\gsub('%.Tiler$', '') .. "."
 with love
   .load = ->
     print cwd
-    t = Tiler "tests/ortho.lua", { "Camera" }
+    export t = Tiler "tests/level1.lua"
     export input = Input!
-    export camera = t.Camera!
-    camera\setFollowStyle('LOCKON')
+    export width = love.graphics.getWidth!
+    export height = love.graphics.getHeight!
+
+    export camera = Camera width/2 + 50, height/2 + 50, height
+    camera\setDeadzone 40, height/2 - 40, width - 80, 80
+    camera\setFollowStyle('TOPDOWN')
     camera\setFollowLerp(0.2)
     camera\setFollowLead(0)
+
+
+
     input\bindArr {
       'right': 'right'
       'left': 'left'
@@ -36,6 +44,7 @@ with love
     }
 
   .update = (dt) ->
+    t\update dt
     if input\down "right"
       rec.x += 10
     if input\down "left"
@@ -52,10 +61,6 @@ with love
     camera\follow rec.x, rec.y
 
   .draw = ->
-    Graphics = love.graphics
-    camera\attach!
-    Graphics.rectangle 'fill', rec.x, rec.y, 20, 20
-    Graphics.rectangle 'fill', 50, 50, 20, 20
-    camera\detach!
-    camera\draw!
+    t\draw!
+
 

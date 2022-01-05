@@ -26,6 +26,106 @@ hexToColor = (hex) ->
     b: tonumber(hex\sub(5, 6), 16) / 255
   }
 
+convertIsometricToScreen = (map, x, y) =>
+  mapW    = map.width
+  tileW   = map.tilewidth
+  tileH   = map.tileheight
+  tileX   = x / tileH
+  tileY   = y / tileH
+  offsetX = mapW * tileW / 2
+  return (tileX - tileY) * tileW / 2 + offsetX, (tileX + tileY) * tileH / 2
+
+rotateVertex = (map, vertex, x, y, cos, sin, oy) ->
+  if map.orientation == "isometric"
+    x, y               = convertIsometricToScreen(map, x, y)
+    vertex.x, vertex.y = convertIsometricToScreen(map, vertex.x, vertex.y)
+
+  vertex.x = vertex.x - x
+  vertex.y = vertex.y - y
+
+  return x + cos * vertex.x - sin * vertex.y, y + sin * vertex.x + cos * vertex.y - (oy or 0)
+
+
+compensate = (tile, tileX, tileY, tileW, tileH) ->
+  compx = 0
+  compy = 0
+
+  if tile.sx < 0 then compx = tileW
+  if tile.sy < 0 then compy = tileH
+
+  if tile.r > 0
+    tileX = tileX + tileH - compy
+    tileY = tileY + tileH + compx - tileW
+  elseif tile.r < 0
+    tileX = tileX + compy
+    tileY = tileY - compx + tileH
+  else
+    tileX = tileX + compx
+    tileY = tileY + compy
+
+  tileX, tileY
+
+
+convertEllipseToPolygon = (x, y, w, h, max_segments) ->
+  ceil = math.ceil
+  cos  = math.cos
+  sin  = math.sin
+
+  calc_segments = (segments) ->
+    vdist = (a, b) ->
+      c = {
+				x: a.x - b.x,
+				y: a.y - b.y,
+			}
+
+      c.x * c.x + c.y * c.y
+
+
+    segments = segments or 64
+    vertices = {}
+
+    v = { 1, 2, ceil(segments/4-1), ceil(segments/4) }
+
+    local m
+    if love and love.physics
+      m = love.physics.getMeter!
+    else
+      m = 32
+
+    for _, i in ipairs(v)
+      angle = (i / segments) * math.pi * 2
+      px    = x + w / 2 + cos(angle) * w / 2
+      py    = y + h / 2 + sin(angle) * h / 2
+      table.insert(vertices, { x: px / m, y: py / m })
+
+    dist1 = vdist(vertices[1], vertices[2])
+    dist2 = vdist(vertices[3], vertices[4])
+
+    -- Box2D threshold
+    if dist1 < 0.0025 or dist2 < 0.0025
+      calc_segments(segments-2)
+    segments
+
+
+  segments = calc_segments(max_segments)
+  vertices = {}
+
+  table.insert vertices, { x: x + w / 2, y: y + h / 2 }
+
+  for i = 0, segments
+    angle = (i / segments) * math.pi * 2
+    px    = x + w / 2 + cos(angle) * w / 2
+    py    = y + h / 2 + sin(angle) * h / 2
+
+    table.insert(vertices, { x: px, y: py })
+
+  vertices
+
+
+
+-- TILER CLASS
+
+
 class Tiler
   new: (path, plugins, ox, oy) =>
 
@@ -54,23 +154,14 @@ class Tiler
       @loadPlugins plugins
 
     @resize!
-    @width = nil
-    @height = nil
     @objects = {}
     @tiles = {}
     @tileInstances = {}
-    @drawRange = {
-      sx: 1
-      sy: 1
-      ex: @width
-      ey: @height
-    }
     @offsetX = ox or 0
     @offsetY = oy or 0
     @cache = {}
     @freeBatchSprites = {}
     setmetatable @freeBatchSprites, { __mode: 'k' }
-    @layers = {}
 
     gid = 1
     for i, tileset in ipairs @tilesets
@@ -123,7 +214,260 @@ class Tiler
 
     if layer.type == "tilelayer"
       @setTileData layer
+      @setSpriteBatches layer
+      layer.draw = -> @drawTileLayer layer
+    elseif layer.type == "objectgroup"
+      @setObjectData layer
+      @setObjectCoordinates layer
+      @setObjectSpriteBatches layer
+      layer.draw = -> @drawObjectLayer layer
+    elseif layer.type == "imagelayer"
+      layer.draw = -> @drawImageLayer layer
 
+      if layer.image ~= "" then
+        formattedPath = formatPath(@dir .. layer.image)
+        if not @cache[formattedPath] then
+          @cacheImage(formattedPath)
+
+        layer.image  = @cache[formattedPath]
+        layer.width  = layer.image\getWidth!
+        layer.height = layer.image\getHeight!
+
+    @layers[layer.name] = layer
+
+
+  setObjectSpriteBatches: (layer) =>
+    newBatch = Graphics.newSpriteBatch
+    batches  = {}
+
+    if layer.draworder == "topdown"
+      table.sort(layer.objects, (a, b) ->
+        a.y + a.height < b.y + b.height
+      )
+
+    for _, object in ipairs(layer.objects)
+      if object.gid
+        tile    = self.tiles[object.gid] or self\setFlippedGID(object.gid)
+        tileset = tile.tileset
+        image   = self.tilesets[tileset].image
+
+        batches[tileset] = batches[tileset] or newBatch(image)
+
+        sx = object.width  / tile.width
+        sy = object.height / tile.height
+
+        -- Tiled rotates around bottom left corner, where love2D rotates around top left corner
+        ox = 0
+        oy = tile.height
+
+        batch = batches[tileset]
+        tileX = object.x + tile.offset.x
+        tileY = object.y + tile.offset.y
+        tileR = math.rad(object.rotation)
+
+        -- Compensation for scale/rotation shift
+        if tile.sx == -1
+          tileX = tileX + object.width
+
+          if tileR ~= 0
+            tileX = tileX - object.width
+            ox = ox + tile.width
+
+
+
+        if tile.sy == -1
+          tileY = tileY - object.height
+
+          if tileR ~= 0
+            tileY = tileY + object.width
+            oy = oy - tile.width
+
+        instance = {
+          id: batch\add(tile.quad, tileX, tileY, tileR, tile.sx * sx, tile.sy * sy, ox, oy),
+          batch: batch,
+          layer: layer,
+          gid: tile.gid,
+          x: tileX,
+          y: tileY - oy,
+          r: tileR,
+          oy: oy
+        }
+
+        self.tileInstances[tile.gid] = self.tileInstances[tile.gid] or {}
+        table.insert(self.tileInstances[tile.gid], instance)
+
+    layer.batches = batches
+
+
+  getLayerTilePosition: (layer, tile, x, y) =>
+    tileW = @tilewidth
+    tileH = @tileheight
+    local tileX, tileY
+
+    if @orientation == "orthogonal"
+      tileset = @tilesets[tile.tileset]
+      tileX = (x - 1) * tileW + tile.offset.x
+      tileY = (y - 0) * tileH + tile.offset.y - tileset.tileheight
+      tileX, tileY = compensate(tile, tileX, tileY, tileW, tileH)
+    elseif @orientation == "isometric"
+      tileX = (x - y) * (tileW / 2) + tile.offset.x + layer.width * tileW / 2 - @tilewidth / 2
+      tileY = (x + y - 2) * (tileH / 2) + tile.offset.y
+    else
+      sideLen = @hexsidelength or 0
+      if @staggeraxis == "y"
+        if @staggerindex == "odd"
+          if y % 2 == 0
+            tileX = (x - 1) * tileW + tileW / 2 + tile.offset.x
+          else
+            tileX = (x - 1) * tileW + tile.offset.x
+        else
+          if y % 2 == 0
+            tileX = (x - 1) * tileW + tile.offset.x
+          else
+            tileX = (x - 1) * tileW + tileW / 2 + tile.offset.x
+
+        rowH = tileH - (tileH - sideLen) / 2
+        tileY = (y - 1) * rowH + tile.offset.y
+      else
+        if @staggerindex == "odd"
+          if x % 2 == 0
+            tileY = (y - 1) * tileH + tileH / 2 + tile.offset.y
+          else
+            tileY = (y - 1) * tileH + tile.offset.y
+        else
+          if x % 2 == 0
+            tileY = (y - 1) * tileH + tile.offset.y
+          else
+            tileY = (y - 1) * tileH + tileH / 2 + tile.offset.y
+
+        colW = tileW - (tileW - sideLen) / 2
+        tileX = (x - 1) * colW + tile.offset.x
+
+    tileX, tileY
+
+
+  setSpriteBatches: (layer) =>
+    if layer.chunks
+      for _, chunk in ipairs(layer.chunks)
+        @setBatches(layer, chunk)
+      return
+
+    @setBatches layer
+
+
+  addNewLayerTile: (layer, chunk, tile, x, y) =>
+    tileset = tile.tileset
+    img = @tilesets[tileset].image
+    local batches, size
+
+    if chunk
+      batches = chunk.batches
+      size = chunk.width * chunk.height
+    else
+      batches = layer.batches
+      size = layer.width * layer.height
+
+    batches[tileset] = batches[tileset] or Graphics.newSpriteBatch img, size
+
+    batch = batches[tileset]
+    tileX, tileY = @getLayerTilePosition layer, tile, x, y
+
+    instance = {
+      layer: layer
+      chunk: chunk
+      gid: tile.gid
+      x: tileX
+      y: tileY
+      r: tile.r
+      oy: 0
+    }
+
+    if batch
+      instance.batch = batch
+      instance.id = batch\add tile.quad, tileX, tileY, tile.r, tile.sx, tile.sy
+
+    @tileInstances[tile.gid] = @tileInstances[tile.gid] or {}
+    table.insert @tileInstances[tile.gid], instance
+
+  setBatches: (layer, chunk) =>
+    if chunk
+      chunk.batches = {}
+    else
+      layer.batches = {}
+
+    if @orientation == "orthogonal" or @orientation == "isometric"
+      offsetX = chunk and chunk.x or 0
+      offsetY = chunk and chunk.y or 0
+
+      startX = 1
+      startY = 1
+      endX = chunk and chunk.width or layer.width
+      endY = chunk and chunk.height or layer.height
+      incX = 1
+      incY = 1
+
+      -- Oder of adding tiles to sprite batch
+      if @renderorder == "right-up"
+        startY, endY, incY = endY, startY, -1
+      elseif @renderorder == "left-down"
+        startX, endX, incX = endX, startX, -1
+      elseif @renderorder == "left-up"
+        startX, endX, incX = endX, startX, -1
+        startY, endY, incY = endY, startY, -1
+
+      for y = startY, endY, incY
+        for x = startX, endX, incX
+          local tile
+          if chunk
+            tile = chunk.data[y][x]
+          else
+            tile = layer.data[y][x]
+
+          if tile
+            @addNewLayerTile layer, chunk, tile, x + offsetX, y + offsetY
+    else
+      if @staggeraxis == "y"
+        for y = 1, (chunk and chunk.height or layer.height)
+          for x = 1, (chunk and chunk.width or layer.width)
+            local tile
+            if chunk
+              tile = chunk.data[y][x]
+            else
+              tile = layer.data[y][x]
+
+            if tile
+              @addNewLayerTile layer, chunk, tile, x, y
+      else
+        i = 0
+        local _x
+
+        if @staggerindex == "odd"
+          _x = 1
+        else
+          _x = 2
+
+        floor = math.floor
+        -- print chunk.width, layer.width
+        while i < (chunk and chunk.width * chunk.height or layer.width * layer.height)
+          for _y = 1, (chunk and chunk.height or layer.height) + 0.5, 0.5
+            y = floor _y
+
+            for x = _x, (chunk and chunk.width or layer.width), 2
+              i += 1
+
+              local tile
+              if chunk
+                tile = chunk.data[y][x]
+              else
+                tile = layer.data[y][x]
+
+              if tile
+                @addNewLayerTile layer, chunk, tile, x, y
+
+              if _x == 1
+                _x = 2
+              else
+                _x = 1
 
 
   setTileData: (layer) =>
@@ -171,6 +515,7 @@ class Tiler
   fixTransparentColor:(tileset, path) =>
     limage = love.image
     imageData = limage.newImageData path
+    tileset.image = Graphics.newImage imageData
 
     if tileset.transparentColor
       TRANSPARENT_COLOR = hexToColor tileset.transparentColor
@@ -233,7 +578,7 @@ class Tiler
         quadX = (x - 1) * tileW + margin + (x - 1) * spacing
         quadY = (y - 1) * tileH + margin + (y - 1) * spacing
         type = ""
-        properties, terrain, animation, objectGroup
+        local properties, terrain, animation, objectGroup
 
         for _, tile in pairs tileset.tiles
           if tile.id == id
@@ -279,6 +624,55 @@ class Tiler
     for i = 0, data\len! / ffi.sizeof "uint32_t"
       table.insert d, tonumber(decoded[i])
     d
+
+  setObjectCoordinates: (layer) =>
+    for _, object in ipairs(layer.objects)
+      x   = layer.x + object.x
+      y   = layer.y + object.y
+      w   = object.width
+      h   = object.height
+      cos = math.cos(math.rad(object.rotation))
+      sin = math.sin(math.rad(object.rotation))
+
+      if object.shape == "rectangle" and not object.gid
+        object.rectangle = {}
+
+        vertices = {
+          { x: x,     y: y     }
+          { x: x + w, y: y     }
+          { x: x + w, y: y + h }
+          { x: x,     y: y + h }
+        }
+
+        for _, vertex in ipairs(vertices)
+          vertex.x, vertex.y = rotateVertex(self, vertex, x, y, cos, sin)
+          table.insert(object.rectangle, { x: vertex.x, y: vertex.y })
+
+      elseif object.shape == "ellipse"
+        object.ellipse = {}
+        vertices = convertEllipseToPolygon(x, y, w, h)
+
+        for _, vertex in ipairs(vertices)
+          vertex.x, vertex.y = rotateVertex(self, vertex, x, y, cos, sin)
+          table.insert(object.ellipse, { x: vertex.x, y: vertex.y })
+
+      elseif object.shape == "polygon"
+        for _, vertex in ipairs(object.polygon)
+          vertex.x           = vertex.x + x
+          vertex.y           = vertex.y + y
+          vertex.x, vertex.y = rotateVertex(self, vertex, x, y, cos, sin)
+
+      elseif object.shape == "polyline"
+        for _, vertex in ipairs(object.polyline)
+          vertex.x           = vertex.x + x
+          vertex.y           = vertex.y + y
+          vertex.x, vertex.y = rotateVertex(self, vertex, x, y, cos, sin)
+
+
+  setObjectData: (layer) =>
+    for _, object in ipairs(layer.objects)
+      object.layer            = layer
+      @objects[object.id] = object
 
   setFlippedGID: (gid) =>
     bit31   = 2147483648
@@ -344,6 +738,146 @@ class Tiler
     @tiles[gid]
 
 
+  drawLayer: (layer) =>
+    r,g,b,a = Graphics.getColor()
+    Graphics.setColor(r, g, b, a * layer.opacity)
+    layer\draw!
+    Graphics.setColor(r,g,b,a)
+
+  drawTileLayer: (layer) =>
+    if type(layer) == "string" or type(layer) == "number"
+		  layer = @layers[layer]
+    assert(layer.type == "tilelayer", "Invalid layer type: " .. layer.type .. ". Layer must be of type: tilelayer")
+
+    if layer.chunks
+      for _, chunk in ipairs(layer.chunks)
+        for _, batch in pairs(chunk.batches)
+          Graphics.draw batch, 0, 0
+      return
+
+    floor = math.floor
+    for _, batch in pairs(layer.batches)
+      Graphics.draw(batch, floor(layer.x), floor(layer.y))
+
+
+  drawObjectLayer: (layer) =>
+    if type(layer) == "string" or type(layer) == "number"
+		  layer = @layers[layer]
+
+    assert(layer.type == "objectgroup", "Invalid layer type: " .. layer.type .. ". Layer must be of type: objectgroup")
+
+    line  = { 160, 160, 160, 255 * layer.opacity       }
+    fill  = { 160, 160, 160, 255 * layer.opacity * 0.5 }
+    r,g,b,a = Graphics.getColor()
+    reset = {   r,   g,   b,   a * layer.opacity       }
+
+    sortVertices = (obj) ->
+      vertex = {}
+      for _, v in ipairs(obj)
+        table.insert(vertex, v.x)
+        table.insert(vertex, v.y)
+
+      vertex
+
+
+    drawShape = (obj, shape) ->
+      vertex = sortVertices(obj)
+
+      if shape == "polyline"
+        Graphics.setColor(line)
+        Graphics.line(vertex)
+        return
+      elseif shape == "polygon"
+        Graphics.setColor(fill)
+        if not love.math.isConvex(vertex)
+          triangles = love.math.triangulate(vertex)
+          for _, triangle in ipairs(triangles)
+            Graphics.polygon("fill", triangle)
+        else
+          Graphics.polygon("fill", vertex)
+      else
+        Graphics.setColor(fill)
+        Graphics.polygon("fill", vertex)
+
+      Graphics.setColor(line)
+      Graphics.polygon("line", vertex)
+
+    for _, object in ipairs(layer.objects)
+      if object.visible
+        if object.shape == "rectangle" and not object.gid
+          drawShape(object.rectangle, "rectangle")
+        elseif object.shape == "ellipse"
+          drawShape(object.ellipse, "ellipse")
+        elseif object.shape == "polygon"
+          drawShape(object.polygon, "polygon")
+        elseif object.shape == "polyline"
+          drawShape(object.polyline, "polyline")
+        elseif object.shape == "point"
+          Graphics.points(object.x, object.y)
+
+    Graphics.setColor(reset)
+    for _, batch in pairs(layer.batches)
+      Graphics.draw(batch, 0, 0)
+
+    Graphics.setColor(r,g,b,a)
+
+
+  drawImageLayer: (layer) =>
+    if type(layer) == "string" or type(layer) == "number"
+      layer = @layers[layer]
+
+    assert(layer.type == "imagelayer", "Invalid layer type: " .. layer.type .. ". Layer must be of type: imagelayer")
+
+    if layer.image ~= ""
+      Graphics.draw(layer.image, layer.x, layer.y)
+
+
+  update: (dt) =>
+    for _, tile in pairs @tiles
+      update = false
+
+      if tile.animation
+        tile.time += dt *1000
+        while tile.time > tonumber(tile.animation[tile.frame].duration)
+          update = true
+          tile.time -= tonumber(tile.animation[tile.frame].duration)
+          tile.frame += 1
+
+          if tile.frame > #tile.animation then tile.frame = 1
+
+        if update and @tileInstances[tile.gid]
+          for _, j in pairs @tileInstances[tile.gid]
+            t = @tiles[tonumber(tile.animation[tile.frame].tileid) + @tilesets[tile.tileset].firstgid]
+            j.bash\set j.id, t.quad, j.x, j.y, j.r, tile.sx, tile.sy, 0, j.oy
+
+    for _, layer in ipairs @layers
+      layer\update dt
+
+  draw: (tx, ty, sx, sy) =>
+    cCanvas = Graphics.getCanvas!
+    Graphics.setCanvas @canvas
+    Graphics.clear!
+
+    Graphics.push!
+    Graphics.origin!
+    Graphics.translate(math.floor(tx or 0), math.floor(ty or 0))
+
+    for _, layer in ipairs @layers
+      if layer.visible and layer.opacity > 0
+        @drawLayer layer
+
+    Graphics.pop!
+
+    Graphics.push!
+    Graphics.origin!
+    Graphics.scale(sx or 1, sy or sx or 1)
+
+    Graphics.setCanvas cCanvas
+    Graphics.draw @canvas
+
+    Graphics.pop!
 
 
 
+
+Tiler
