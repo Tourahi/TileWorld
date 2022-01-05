@@ -877,7 +877,14 @@ class Tiler
 
     Graphics.pop!
 
+  getCanvas: =>
+    @canvas
 
+  -- Use this for drawing if you are usign a camera
+  drawLayers: =>
+    for _, layer in ipairs @layers
+          if layer.visible and layer.opacity > 0
+            @drawLayer layer
 
 
 Tiler

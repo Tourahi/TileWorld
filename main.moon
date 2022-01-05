@@ -7,8 +7,8 @@ M = assert require 'moon'
 export Dump = M.p
 
 rec = {
-  x: 10,
-  y: 10
+  x: 100,
+  y: 100
 }
 
 cwd = (...)\gsub('%.Tiler$', '') .. "."
@@ -22,11 +22,11 @@ with love
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
 
-    export camera = Camera width/2 + 50, height/2 + 50, height
-    camera\setDeadzone 40, height/2 - 40, width - 80, 80
-    camera\setFollowStyle('TOPDOWN')
+    export camera = Camera!
+
+    camera\setFollowStyle('PLATFORMER')
     camera\setFollowLerp(0.2)
-    camera\setFollowLead(0)
+    camera\setScale 4
 
 
 
@@ -46,13 +46,13 @@ with love
   .update = (dt) ->
     t\update dt
     if input\down "right"
-      rec.x += 10
+      rec.x += 2.5
     if input\down "left"
-      rec.x -= 10
+      rec.x -= 2.5
     if input\down "up"
-      rec.y -= 10
+      rec.y -= 2.5
     if input\down "down"
-      rec.y += 10
+      rec.y += 2.5
     if input\pressed 's'
       camera\shake(8, 1, 60)
     if input\pressed 'l'
@@ -61,6 +61,9 @@ with love
     camera\follow rec.x, rec.y
 
   .draw = ->
-    t\draw!
+    camera\attach!
+    t\drawLayers!
+    love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+    camera\detach!
 
 

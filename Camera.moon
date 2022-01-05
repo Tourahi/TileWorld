@@ -297,6 +297,10 @@ class Camera
     @fading = true
 
 
+  setScale: (s) =>
+    @scale = s
+
+
 
 
 -- return
