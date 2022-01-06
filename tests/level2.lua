@@ -47,7 +47,7 @@ return {
       width = 32,
       height = 32,
       id = 1,
-      name = "Tile Layer 1",
+      name = "world",
       visible = true,
       opacity = 1,
       offsetx = 0,
