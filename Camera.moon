@@ -55,7 +55,8 @@ class Camera
     @targetFadeColor = {0, 0, 0, 1}
     @fadeAction = nil
     @fading = false
-
+    @canvas = Graphics.newCanvas @w, @h
+    @canvas\setFilter "nearest", "nearest"
 
 
   attach: =>
@@ -300,6 +301,34 @@ class Camera
   setScale: (s) =>
     @scale = s
 
+
+  attachC: (canvas = @canvas, callback) =>
+    Graphics = love.graphics
+    _canvas = Graphics.getCanvas!
+
+    Graphics.setCanvas canvas
+    Graphics.clear!
+
+    Graphics.push!
+    Graphics.origin!
+    Graphics.translate @w/2, @h/2
+    Graphics.scale @scale
+    Graphics.rotate @rot
+    Graphics.translate -@x, -@y
+
+
+    if callback
+      callback!
+
+    Graphics.pop!
+
+    Graphics.push!
+    Graphics.origin!
+
+    Graphics.setCanvas _canvas
+    Graphics.draw canvas
+
+    Graphics.pop!
 
 
 

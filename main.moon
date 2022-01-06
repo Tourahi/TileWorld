@@ -17,7 +17,7 @@ cwd = (...)\gsub('%.Tiler$', '') .. "."
 with love
   .load = ->
     print cwd
-    export t = Tiler "tests/level1.lua"
+    export t = Tiler "tests/level2.lua"
     export input = Input!
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
@@ -26,7 +26,7 @@ with love
 
     camera\setFollowStyle('PLATFORMER')
     camera\setFollowLerp(0.2)
-    camera\setScale 4
+    camera\setScale 3
 
 
 
@@ -46,13 +46,13 @@ with love
   .update = (dt) ->
     t\update dt
     if input\down "right"
-      rec.x += 2.5
+      rec.x += 300 * dt
     if input\down "left"
-      rec.x -= 2.5
+      rec.x -= 300 * dt
     if input\down "up"
-      rec.y -= 2.5
+      rec.y -= 300 * dt
     if input\down "down"
-      rec.y += 2.5
+      rec.y += 300 * dt
     if input\pressed 's'
       camera\shake(8, 1, 60)
     if input\pressed 'l'
@@ -60,10 +60,17 @@ with love
     camera\update dt
     camera\follow rec.x, rec.y
 
+
+
+
   .draw = ->
-    camera\attach!
-    t\drawLayers!
-    love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
-    camera\detach!
+    --camera\attach!
+    --t\drawLayers!
+    --love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+    --camera\detach!
+
+    camera\attachC t\getCanvas!, ->
+      t\drawLayers!
+      love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
 
 

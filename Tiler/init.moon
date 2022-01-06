@@ -837,7 +837,7 @@ class Tiler
       update = false
 
       if tile.animation
-        tile.time += dt *1000
+        tile.time += dt * 1000
         while tile.time > tonumber(tile.animation[tile.frame].duration)
           update = true
           tile.time -= tonumber(tile.animation[tile.frame].duration)
