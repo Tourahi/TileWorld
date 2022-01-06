@@ -17,19 +17,16 @@ cwd = (...)\gsub('%.Tiler$', '') .. "."
 with love
   .load = ->
     print cwd
-    love.window.setMode 800, 600
     love.graphics.setDefaultFilter('nearest', 'nearest')
     export t = Tiler "tests/level2.lua"
     export input = Input!
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
 
-    export camera = Camera 200, 150, 400, 300
+    export camera = Camera 0, 0, t.width * t.tilewidth, t.height * t.tileheight
+    --export camera = Camera.new 0, 0, t.width * t.tilewidth, t.height * t.tileheight
 
-    camera.drawDeadzone = true
-
-    camera\setFollowStyle('PLATFORMER')
-    camera\setFollowLerp(0.2)
+    camera\setScale 2
 
 
     input\bindArr {
@@ -66,20 +63,18 @@ with love
     mapw = t.width * t.tilewidth
     maph = t.height * t.tileheight
 
-
-
-    --print camera.x, camera.y
-    camera\update dt
     camera\follow rec.x, rec.y
+    camera\update dt
+
 
 
 
 
   .draw = ->
+    camera\draw ->
+      t\drawLayers!
+      love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
 
-    t\drawLayers!
-
-    -- camera\draw!
     --camera\attachC t\getCanvas!, ->
       --t\drawLayer t.layers["world"]
       --love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
