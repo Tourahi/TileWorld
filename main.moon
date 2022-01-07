@@ -24,9 +24,10 @@ with love
     export height = love.graphics.getHeight!
 
     export camera = Camera 0, 0, t.width * t.tilewidth, t.height * t.tileheight
+
     --export camera = Camera.new 0, 0, t.width * t.tilewidth, t.height * t.tileheight
 
-    camera\setScale 2
+    camera\setScale 4
 
 
     input\bindArr {
@@ -53,7 +54,7 @@ with love
     if input\down "down"
       rec.y += 500 *dt
     if input\pressed 's'
-      camera\shake(8, 1, 60)
+      camera\flash(0.1, {1, 0, 0, 1})
     if input\pressed 'l'
       Leak.report!
     Graphics = love.graphics
@@ -71,9 +72,11 @@ with love
 
 
   .draw = ->
-    camera\draw ->
+    camera\attach ->
       t\drawLayers!
       love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+    camera\draw!
+
 
     --camera\attachC t\getCanvas!, ->
       --t\drawLayer t.layers["world"]

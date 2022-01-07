@@ -70,6 +70,8 @@ class Camera
     @flashColor = {0, 0, 0, 1}
     @flashing = false
       -- shake
+    @horiShakes = {}
+    @vertiShakes = {}
     @lastHoriShakeAmount = 0
     @lastVertiShakeAmount = 0
       -- fade
@@ -134,13 +136,79 @@ class Camera
     @adjustScale!
     @adjustPosition!
 
+  toWorldCoords: (x, y) =>
+    c, s = math.cos(@angle), math.sin(@angle)
+    x, y = (x - @w/2)/@scale, (y - @h/2)/@scale
+    x, y = c*x - s*y, s*x + c*y
+    x + @scrollX, y + @scrollY
+
+  getMousePosition: =>
+    m = love.mouse
+    @toWorldCoords m.getPosition!
+
+  move: (dx, dy) =>
+    @scrollX, @scrollY = @scrollX + dx, @scrollY + dy
+
+  shake: (intensity, dur, freq, axes = 'XY') =>
+    axes = string.upper axes
+
+    if string.find(axes, 'X')
+      table.insert @horiShakes, Shake(intensity, freq,dur * 1000)
+    if string.find(axes, 'X')
+      table.insert @vertiShakes, Shake(intensity, freq,dur * 1000)
+
   update: (dt) =>
+    @mx, @my = @getMousePosition!
+
+    -- Flash
+    if @flashing
+      @flashTimer = @flashTimer + dt
+      if @flashTimer > @flashDuration
+        @flashTimer = 0
+        @flashing = false
+
+    -- Fade
+    if @fading
+      @fadeTimer = @fadeTimer + dt
+      @fadeColor = {
+        lerp(@baseFadeColor[1], @targetFadeColor[1], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[2], @targetFadeColor[2], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[3], @targetFadeColor[3], @fadeTimer/@fadeDur),
+        lerp(@baseFadeColor[4], @targetFadeColor[4], @fadeTimer/@fadeDur),
+      }
+      if @fadeTimer > @fadeDur
+        @fadeTimer = 0
+        @fading = false
+        if @fadeAction then @fadeAction!
+
+    -- Shake Horizontal
+    horiShakeAmount, vertiShakeAmount = 0, 0
+    for i = #@horiShakes, 1, -1 do
+      @horiShakes[i]\update dt
+      horiShakeAmount += @horiShakes[i]\getAmplitude!
+      if not @horiShakes[i]\isShaking! then table.remove(@horiShakes, i)
+    -- Shake Vertical
+    for i = #@vertiShakes, 1, -1 do
+      @vertiShakes[i]\update dt
+      vertiShakeAmount += @vertiShakes[i]\getAmplitude!
+      if not @vertiShakes[i]\isShaking! then table.remove(@vertiShakes, i)
+
+    @scrollX, @scrollY = @scrollX - @lastHoriShakeAmount, @scrollY - @lastVertiShakeAmount
+    @move horiShakeAmount, vertiShakeAmount
+    @lastHoriShakeAmount, @lastVertiShakeAmount = horiShakeAmount, vertiShakeAmount
 
     if @deadzone == nil
       @x, @y = @scrollX, @scrollY
 
 
-  draw: (f) =>
+  setDeadzone: (x, y, w, h) =>
+      @deadzone = true
+      @deadzoneX = x
+      @deadzoneY = y
+      @deadzoneW = w
+      @deadzoneH = h
+
+  attach: (f) =>
     clip = nil
     Graphics = love.graphics
     sx, sy, sw, sh = Graphics.getScissor!
@@ -162,6 +230,38 @@ class Camera
     Graphics.pop!
 
     if clip then Graphics.setScissor sx, sy, sw, sh
+
+  flash: (dur, color) =>
+    @flashDuration = dur
+    @flashColor = color or @flashColor
+    @flashTimer = 0
+    @flashing = true
+
+  draw: =>
+    Graphics = love.graphics
+    if @drawDeadzone and @deadzone
+      n = Graphics.getLineWidth!
+      Graphics.setLineWidth 2
+      Graphics.line @deadzoneX - 1, @deadzoneY, @deadzoneX + 6, @deadzoneY
+      Graphics.line @deadzoneX, @deadzoneY, @deadzoneX, @deadzoneY + 6
+      Graphics.line @deadzoneX - 1, @deadzoneY + @deadzoneH, @deadzoneX + 6, @deadzoneY + @deadzoneH
+      Graphics.line @deadzoneX, @deadzoneY + @deadzoneH, @deadzoneX, @deadzoneY + @deadzoneH - 6
+      Graphics.line @deadzoneX + @deadzoneW + 1, @deadzoneY + @deadzoneH, @deadzoneX + @deadzoneW - 6, @deadzoneY + @deadzoneH
+      Graphics.line @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH, @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH - 6
+      Graphics.line @deadzoneX + @deadzoneW + 1, @deadzoneY, @deadzoneX + @deadzoneW - 6, @deadzoneY
+      Graphics.line @deadzoneX + @deadzoneW, @deadzoneY, @deadzoneX + @deadzoneW, @deadzoneY + 6
+      Graphics.setLineWidth n
+
+    if @flashing
+      r, g, b, a = Graphics.getColor!
+      Graphics.setColor @flashColor
+      Graphics.rectangle 'fill', 0, 0, @w, @h
+      Graphics.setColor r, g, b, a
+
+    r, g, b, a = Graphics.getColor!
+    Graphics.setColor @fadeColor
+    Graphics.rectangle 'fill', 0, 0, @w, @h
+    Graphics.setColor r, g, b, a
 
 -- return
 Camera
