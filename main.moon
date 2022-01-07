@@ -23,13 +23,14 @@ with love
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
 
-    export camera = Camera 0, 0, nil, nil, 2
+
+    export camera = Camera 0, 0, nil, nil, 2, 0, t.width, t.height, t.tilewidth
 
     -- export camera = Camera.new 0, 0, nil, nil, 2
 
-    camera\setScale 2
-    camera\setFollowStyle "PLATFORMER"
-    camera\setFollowLerp 0.2
+    camera\setScale 3
+    camera\setFollowStyle "SCREEN_BY_SCREEN"
+    camera\setFollowLerp 0.1
     camera.drawDeadzone = true
 
 
@@ -49,13 +50,13 @@ with love
   .update = (dt) ->
     t\update dt
     if input\down "right"
-      rec.x += 300 *dt
+      rec.x += 200 * dt
     if input\down "left"
-      rec.x -= 300 *dt
+      rec.x -= 200 * dt
     if input\down "up"
-      rec.y -= 300 *dt
+      rec.y -= 200 * dt
     if input\down "down"
-      rec.y += 300 *dt
+      rec.y += 200 * dt
     if input\pressed 's'
       camera\flash(0.1, {1, 0, 0, 1})
     if input\pressed 'l'
@@ -79,7 +80,7 @@ with love
 
     camera\attach!
     t\drawLayers!
-    love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+    love.graphics.rectangle "fill", rec.x, rec.y, 16, 16
     camera\detach!
     camera\draw!
 

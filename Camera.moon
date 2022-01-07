@@ -5,20 +5,27 @@ lerp = (a, b, x) -> a + (b - a) * x
 clamp = (x, minX, maxX) -> x < minX and minX or (x>maxX and maxX or x)
 
 class Camera
-  new: (x, y, w, h, scale, rot) =>
+  new: (l, t, w, h, scale, rot, mw, mh, tw, th) =>
     Graphics = love.graphics
     windowW, windowH = Graphics.getWidth!, Graphics.getHeight!
-    @x = x or (w or Graphics.getWidth! / 2)
+    @x = w or Graphics.getWidth! / 2
 
-    @y = x or (h or Graphics.getHeight! / 2)
+    @mw = mw or 0
+    @mh = mh or 0
+    @tw = tw or 0
+    @th = th or @tw
+
+
+
+    @y = h or Graphics.getHeight! / 2
     @mx = @x
     @my = @y
     @screenX = @x
     @screenY = @y
     @w = w or Graphics.getWidth!
     @h = h or Graphics.getHeight!
-    @l = 0
-    @t = 0
+    @l = l or 0
+    @t = t or 0
     @scale = scale or 1
     @rot = rot or 0
     @horiShakes = {}
@@ -37,6 +44,10 @@ class Camera
     @sin = math.sin 0
     @cos = math.cos 0
 
+
+    print mw, mh, tw, @th
+    print @w, @h
+
     @setWorld @l, @t, @w, @h
 
 
@@ -46,11 +57,6 @@ class Camera
     @deadzoneY = 0
     @deadzoneW = 0
     @deadzoneH = 0
-    @bound = nil
-    @boundsMinX = 0
-    @boundsMinY = 0
-    @boundsMaxX = 0
-    @boundsMaxY = 0
     @drawDeadzone = false
     @flashDuration = 1
     @flashTimer = 0
@@ -80,8 +86,8 @@ class Camera
 
   setWorld: (l,t,w,h) =>
     -- checkAABB l,t,w,h
-    @worldL, @worldT, @worldW, @worldH = l,t,w,h
-    print @worldW, @worldH
+    print w,h
+    @worldL, @worldT, @worldW, @worldH = l,t,(w - (w - (@mw * @tw))) - l,(h - (h - (@mh * @th))) - t
 
     @adjustPosition!
 
@@ -201,10 +207,7 @@ class Camera
 
     if not @deadzone
       @x, @y = @targetX, @targetY
-      if @bound
-        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
-        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
-        @adjustPosition!
+      @adjustPosition!
       return
 
     dx1, dy1, dx2, dy2 = @deadzoneX, @deadzoneY, @deadzoneX + @deadzoneW, @deadzoneY + @deadzoneH
@@ -241,10 +244,6 @@ class Camera
 
       @adjustPosition!
 
-      if @bound
-        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
-        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
-        @adjustPosition!
 
     else
       if targetX < x + (dx1 + dx2 - x)
@@ -272,10 +271,6 @@ class Camera
 
       @adjustPosition!
 
-      if @bound
-        @x = math.min(math.max(@x, @boundsMinX + @w/2), @boundsMaxX - @w/2)
-        @y = math.min(math.max(@y, @boundsMinY + @h/2), @boundsMaxY - @h/2)
-        @adjustPosition!
 
   draw: =>
     Graphics = love.graphics
@@ -300,15 +295,11 @@ class Camera
     Graphics.setColor @fadeColor
     Graphics.rectangle 'fill', 0, 0, @w, @h
     Graphics.setColor r, g, b, a
+
+
   follow: (x, y) =>
     @targetX, @targetY = x, y
 
-  setBounds: (x, y, w, h) =>
-    @bound = true
-    @boundsMinX = x
-    @boundsMinY = y
-    @boundsMaxX = x + w
-    @boundsMaxY = y + h
 
   setFollowStyle: (fs) =>
     @followStyle = fs
