@@ -23,11 +23,14 @@ with love
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
 
-    export camera = Camera 0, 0, t.width * t.tilewidth, t.height * t.tileheight
+    export camera = Camera 0, 0, nil, nil, 2
 
-    --export camera = Camera.new 0, 0, t.width * t.tilewidth, t.height * t.tileheight
+    -- export camera = Camera.new 0, 0, nil, nil, 2
 
-    camera\setScale 4
+    camera\setScale 2
+    camera\setFollowStyle "PLATFORMER"
+    camera\setFollowLerp 0.2
+    camera.drawDeadzone = true
 
 
     input\bindArr {
@@ -46,13 +49,13 @@ with love
   .update = (dt) ->
     t\update dt
     if input\down "right"
-      rec.x += 500 *dt
+      rec.x += 300 *dt
     if input\down "left"
-      rec.x -= 500 *dt
+      rec.x -= 300 *dt
     if input\down "up"
-      rec.y -= 500 *dt
+      rec.y -= 300 *dt
     if input\down "down"
-      rec.y += 500 *dt
+      rec.y += 300 *dt
     if input\pressed 's'
       camera\flash(0.1, {1, 0, 0, 1})
     if input\pressed 'l'
@@ -72,11 +75,17 @@ with love
 
 
   .draw = ->
-    camera\attach ->
-      t\drawLayers!
-      love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+
+
+    camera\attach!
+    t\drawLayers!
+    love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
+    camera\detach!
     camera\draw!
 
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setBlendMode('alpha', 'premultiplied')
+    love.graphics.setBlendMode('alpha')
 
     --camera\attachC t\getCanvas!, ->
       --t\drawLayer t.layers["world"]
