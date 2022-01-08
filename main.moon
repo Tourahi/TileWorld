@@ -29,10 +29,10 @@ with love
 
     camera\setScale 2
     camera\setFollowStyle "LOCKED"
-    camera\setFollowLerp 0.1
+    camera\setFollowLerp 0.2
     camera.drawDeadzone = true
     camera\setBounds 0, 0, 800, 600
-    --camera\setAngle 1
+
 
 
 
@@ -54,6 +54,7 @@ with love
     }
 
   .update = (dt) ->
+
     t\update dt
 
 

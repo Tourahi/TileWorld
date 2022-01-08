@@ -367,6 +367,8 @@ class Camera
   attachC: (canvas = @canvas, callback) =>
     Graphics = love.graphics
     _canvas = Graphics.getCanvas!
+    sx, sy, sw, sh = Graphics.getScissor!
+    Graphics.setScissor @getWindow!
 
 
     Graphics.setCanvas canvas
@@ -392,3 +394,5 @@ class Camera
     Graphics.draw canvas
 
     Graphics.pop!
+
+    Graphics.setScissor sx, sy, sw, sh
