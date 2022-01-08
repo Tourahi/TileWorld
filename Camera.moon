@@ -1,21 +1,18 @@
 Shake = assert require "Shake"
+
 -- Utils
 csnap = (v, x) -> math.ceil(v/x) * x - x/2
 lerp = (a, b, x) -> a + (b - a) * x
 clamp = (x, minX, maxX) -> x < minX and minX or (x>maxX and maxX or x)
 
 class Camera
-  new: (l, t, w, h, scale, rot, mw, mh, tw, th) =>
+  new: (l, t, w, h, scale, rot, mapW, mapH) =>
     Graphics = love.graphics
     windowW, windowH = Graphics.getWidth!, Graphics.getHeight!
     @x = w or Graphics.getWidth! / 2
 
-    @mw = mw or 0
-    @mh = mh or 0
-    @tw = tw or 0
-    @th = th or @tw
-
-
+    @mapW = mapW
+    @mapH = mapH
 
     @y = h or Graphics.getHeight! / 2
     @mx = @x
@@ -44,13 +41,7 @@ class Camera
     @sin = math.sin 0
     @cos = math.cos 0
 
-
-    print mw, mh, tw, @th
-    print @w, @h
-
     @setWorld @l, @t, @w, @h
-
-
 
     @deadzone = nil
     @deadzoneX = 0
@@ -85,10 +76,7 @@ class Camera
     min(w, @worldW), min(h, @worldH)
 
   setWorld: (l,t,w,h) =>
-    -- checkAABB l,t,w,h
-    print w,h
-    @worldL, @worldT, @worldW, @worldH = l,t,(w - (w - (@mw * @tw))) - l,(h - (h - (@mh * @th))) - t
-
+    @worldL, @worldT, @worldW, @worldH = l,t,(w - (w - @mapW)) - l,(h - (h - @mapH)) - t
     @adjustPosition!
 
   adjustPosition: =>
@@ -188,7 +176,7 @@ class Camera
     -- Follow
     if not @targetX and not @targetY then return
     -- Set follow Style
-    if @followStyle == 'LOCKON'
+    if @followStyle == 'LOCKED'
       w, h = @w/16, @w/16
       @setDeadzone (@w - w)/2, (@h - h)/2, w, h
     elseif @followStyle == 'PLATFORMER'
@@ -274,9 +262,10 @@ class Camera
 
   draw: =>
     Graphics = love.graphics
+
     if @drawDeadzone and @deadzone
       n = Graphics.getLineWidth!
-      Graphics.setLineWidth 2
+      Graphics.setLineWidth 4
       Graphics.line @deadzoneX - 1, @deadzoneY, @deadzoneX + 6, @deadzoneY
       Graphics.line @deadzoneX, @deadzoneY, @deadzoneX, @deadzoneY + 6
       Graphics.line @deadzoneX - 1, @deadzoneY + @deadzoneH, @deadzoneX + 6, @deadzoneY + @deadzoneH
@@ -286,11 +275,13 @@ class Camera
       Graphics.line @deadzoneX + @deadzoneW + 1, @deadzoneY, @deadzoneX + @deadzoneW - 6, @deadzoneY
       Graphics.line @deadzoneX + @deadzoneW, @deadzoneY, @deadzoneX + @deadzoneW, @deadzoneY + 6
       Graphics.setLineWidth n
+
     if @flashing
       r, g, b, a = Graphics.getColor!
       Graphics.setColor @flashColor
       Graphics.rectangle 'fill', 0, 0, @w, @h
       Graphics.setColor r, g, b, a
+
     r, g, b, a = Graphics.getColor!
     Graphics.setColor @fadeColor
     Graphics.rectangle 'fill', 0, 0, @w, @h
@@ -329,17 +320,21 @@ class Camera
   setScale: (s) =>
     @scale = s
 
+  getWindow: =>
+    @l, @t, @w, @h
+
 
   attachC: (canvas = @canvas, callback) =>
     Graphics = love.graphics
     _canvas = Graphics.getCanvas!
+
 
     Graphics.setCanvas canvas
     Graphics.clear!
 
     Graphics.push!
     Graphics.origin!
-    Graphics.translate @w/2, @h/2
+    Graphics.translate math.floor(@w/2 or 0), math.floor(@h/2 or 0)
     Graphics.scale @scale
     Graphics.rotate @rot
     Graphics.translate -@x, -@y

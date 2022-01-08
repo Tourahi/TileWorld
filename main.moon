@@ -18,21 +18,19 @@ with love
   .load = ->
     print cwd
     love.graphics.setDefaultFilter('nearest', 'nearest')
+
     export t = Tiler "tests/level2.lua"
     export input = Input!
     export width = love.graphics.getWidth!
     export height = love.graphics.getHeight!
 
 
-    export camera = Camera 0, 0, nil, nil, 2, 0, t.width, t.height, t.tilewidth
+    export camera = Camera 0, 0, nil, nil, 2, 0, t.width * t.tilewidth, t.height * t.tilewidth
 
-    -- export camera = Camera.new 0, 0, nil, nil, 2
-
-    camera\setScale 3
-    camera\setFollowStyle "SCREEN_BY_SCREEN"
-    camera\setFollowLerp 0.1
+    camera\setScale 2
+    camera\setFollowStyle "LOCKED"
+    camera\setFollowLerp 0.2
     camera.drawDeadzone = true
-
 
     input\bindArr {
       'right': 'right'
@@ -43,98 +41,55 @@ with love
       'f4': 'f4'
       'l': 'l'
       's': 's'
+      'f': 'f'
+      'a': 'a'
+      'b': 'b'
+      'c': 'c'
       'return': 'enter'
       'escape': 'escape'
     }
 
   .update = (dt) ->
     t\update dt
+
     if input\down "right"
-      rec.x += 200 * dt
+      rec.x += 300 * dt
     if input\down "left"
-      rec.x -= 200 * dt
+      rec.x -= 300 * dt
     if input\down "up"
-      rec.y -= 200 * dt
+      rec.y -= 300 * dt
     if input\down "down"
-      rec.y += 200 * dt
-    if input\pressed 's'
+      rec.y += 300 * dt
+    if input\pressed 'f'
       camera\flash(0.1, {1, 0, 0, 1})
+    if input\pressed 's'
+      camera\shake(8, 1, 60)
+    if input\pressed 'a'
+      camera\setFollowStyle "LOCKED"
+    if input\pressed 'b'
+      camera\setFollowStyle "PLATFORMER"
+    if input\pressed 'c'
+      camera\setFollowStyle "SCREEN_BY_SCREEN"
     if input\pressed 'l'
       Leak.report!
     Graphics = love.graphics
 
-    w = Graphics.getWidth!
-    h = Graphics.getHeight!
-    mapw = t.width * t.tilewidth
-    maph = t.height * t.tileheight
+
 
     camera\follow rec.x, rec.y
     camera\update dt
 
 
-
-
-
   .draw = ->
-
-
-    camera\attach!
-    t\drawLayers!
-    love.graphics.rectangle "fill", rec.x, rec.y, 16, 16
-    camera\detach!
+    Graphics = love.graphics
+    camera\attachC t\getCanvas!, ->
+      t\drawLayers!
+      love.graphics.rectangle "fill", rec.x, rec.y, 16, 16
     camera\draw!
+    Graphics.setColor {1, 0, 0, 1}
+    Graphics.printf "Camera Follow Style : " .. camera.followStyle, 20, 20, 10000
+    Graphics.setColor {1, 1, 1, 1}
 
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setBlendMode('alpha', 'premultiplied')
-    love.graphics.setBlendMode('alpha')
 
-    --camera\attachC t\getCanvas!, ->
-      --t\drawLayer t.layers["world"]
-      --love.graphics.rectangle "fill", rec.x, rec.y, 6, 6
-    --camera\draw!
-
-  .run = ->
-    if love.load
-      love.load(love.arg.parseGameArguments(arg), arg)
-
-    -- We don't want the first frame's dt to include time taken by love.load.
-    if love.timer
-      love.timer.step!
-
-    dt = 0
-    fixedDt = 1/60
-    acc = 0
-    -- Main loop time.
-    return () ->
-      -- Process events.
-      if love.event
-        love.event.pump!
-        for name, a,b,c,d,e,f in love.event.poll!
-          if name == "quit"
-            if not love.quit or not love.quit!
-              return a or 0
-          love.handlers[name] a,b,c,d,e,f
-
-      -- Update dt, as we'll be passing it to update
-      if love.timer
-        dt = love.timer.step!
-      -- Call update and draw
-      acc += dt
-      while acc >= fixedDt
-        if love.update
-          love.update fixedDt
-        acc -= fixedDt
-
-      if love.graphics and love.graphics.isActive!
-        love.graphics.origin!
-        love.graphics.clear love.graphics.getBackgroundColor!
-
-        if love.draw
-          love.draw!
-
-        love.graphics.present!
-
-      if love.timer
-        love.timer.sleep 0.001
 
 
