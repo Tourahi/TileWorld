@@ -195,6 +195,7 @@ class Camera
 
     if not @deadzone
       @x, @y = @targetX, @targetY
+
       @adjustPosition!
       return
 
@@ -228,7 +229,6 @@ class Camera
 
       @x = lerp @x, @screenX, @followLerpX
       @y = lerp @y, @screenY, @followLerpY
-
 
       @adjustPosition!
 
@@ -292,6 +292,27 @@ class Camera
     @targetX, @targetY = x, y
 
 
+  -- map: Tiled map
+  setBounds: (mapL, mapT, mapW, mapH)=>
+    @worldL, @worldT, @worldW, @worldH = mapL, mapT, mapW, mapH
+
+
+  cornerTransform: (x, y) =>
+    scale, sin, cos = @scale, @sin, @cos
+    x,y = x - @x, y - @y
+    x,y = -cos*x + sin*y, -sin*x - cos*y
+    @x - (x/scale + @l), @y - (y/scale + @t)
+
+  getVisibleCorners: =>
+    x,y,w2,h2 = @x, @y, @w2, @h2
+
+    x1,y1 = @cornerTransform x-w2,y-h2
+    x2,y2 = @cornerTransform x+w2,y-h2
+    x3,y3 = @cornerTransform x+w2,y+h2
+    x4,y4 = @cornerTransform x-w2,y+h2
+
+    x1,y1,x2,y2,x3,y3,x4,y4
+
   setFollowStyle: (fs) =>
     @followStyle = fs
 
@@ -302,6 +323,21 @@ class Camera
   setFollowLead: (x, y) =>
     @followLeadX = x
     @followLeadY = y or x
+
+  adjustScale: =>
+    worldW, worldH = @worldW, @worldH
+    rw, rh = @getVisibleArea 1
+
+    sx, sy = rw/worldW, rh/worldH
+    rscale = math.max sx, sy
+    @scale = math.max @scale, rscale
+
+
+  setAngle: (angle) =>
+    @rot = angle
+    @cos, @sin = math.cos(angle), math.sin(angle)
+    @adjustScale!
+    @adjustPosition!
 
   flash: (dur, color) =>
     @flashDuration = dur
@@ -322,6 +358,10 @@ class Camera
 
   getWindow: =>
     @l, @t, @w, @h
+
+  getVisible: =>
+    w,h = @getVisibleArea!
+    @x - w*0.5, @y - h*0.5, w, h
 
 
   attachC: (canvas = @canvas, callback) =>

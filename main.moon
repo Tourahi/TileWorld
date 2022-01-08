@@ -29,8 +29,12 @@ with love
 
     camera\setScale 2
     camera\setFollowStyle "LOCKED"
-    camera\setFollowLerp 0.2
+    camera\setFollowLerp 0.1
     camera.drawDeadzone = true
+    camera\setBounds 0, 0, 800, 600
+    --camera\setAngle 1
+
+
 
     input\bindArr {
       'right': 'right'
@@ -54,17 +58,17 @@ with love
 
 
     if input\down "right"
-      rec.x += 300 * dt
+      rec.x += 600 * dt
     if input\down "left"
-      rec.x -= 300 * dt
+      rec.x -= 600 * dt
     if input\down "up"
-      rec.y -= 300 * dt
+      rec.y -= 600 * dt
     if input\down "down"
-      rec.y += 300 * dt
+      rec.y += 600 * dt
     if input\pressed 'f'
       camera\flash(0.1, {1, 0, 0, 1})
     if input\pressed 's'
-      camera\shake(8, 1, 60)
+      camera\fade(0.2, {1, 0, 0, 1})
     if input\pressed 'a'
       camera\setFollowStyle "LOCKED"
     if input\pressed 'b'
@@ -84,9 +88,7 @@ with love
   .draw = ->
     Graphics = love.graphics
     camera\attachC nil, ->
-      t\drawLayer t.layers["w"]
-      t\drawLayer t.layers["sdq"]
-      t\drawLayer t.layers["world"]
+      t\drawLayers!
       love.graphics.rectangle "fill", rec.x, rec.y, 16, 16
     camera\draw!
     Graphics.setColor {1, 0, 0, 1}
