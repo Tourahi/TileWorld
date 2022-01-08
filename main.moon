@@ -82,8 +82,10 @@ with love
 
   .draw = ->
     Graphics = love.graphics
-    camera\attachC t\getCanvas!, ->
-      t\drawLayers!
+    camera\attachC nil, ->
+      t\drawLayer t.layers["w"]
+      t\drawLayer t.layers["sdq"]
+      t\drawLayer t.layers["world"]
       love.graphics.rectangle "fill", rec.x, rec.y, 16, 16
     camera\draw!
     Graphics.setColor {1, 0, 0, 1}

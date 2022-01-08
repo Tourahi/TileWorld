@@ -247,9 +247,9 @@ class Tiler
 
     for _, object in ipairs(layer.objects)
       if object.gid
-        tile    = self.tiles[object.gid] or self\setFlippedGID(object.gid)
+        tile    = @tiles[object.gid] or self\setFlippedGID(object.gid)
         tileset = tile.tileset
-        image   = self.tilesets[tileset].image
+        image   = @tilesets[tileset].image
 
         batches[tileset] = batches[tileset] or newBatch(image)
 
@@ -293,8 +293,8 @@ class Tiler
           oy: oy
         }
 
-        self.tileInstances[tile.gid] = self.tileInstances[tile.gid] or {}
-        table.insert(self.tileInstances[tile.gid], instance)
+        @tileInstances[tile.gid] = @tileInstances[tile.gid] or {}
+        table.insert(@tileInstances[tile.gid], instance)
 
     layer.batches = batches
 
@@ -885,6 +885,184 @@ class Tiler
     for _, layer in ipairs @layers
           if layer.visible and layer.opacity > 0
             @drawLayer layer
+
+  addCustomLayer: (name, idx = @layers + 1) =>
+    layer = {
+      type: "customlayer"
+      name: name
+      visible: true
+      opacity: 1
+      properties: {}
+    }
+
+    layer.draw = ->
+    layer.update = ->
+
+    table.insert @layers, idx, layer
+    @layers[name] = @layers[idx]
+
+    layer
+
+  convertToCustomLayer: (idx) =>
+    layer = assert @layers[idx], "Layer not found: " .. idx
+
+    layer.type     = "customlayer"
+    layer.x        = nil
+    layer.y        = nil
+    layer.width    = nil
+    layer.height   = nil
+    layer.encoding = nil
+    layer.data     = nil
+    layer.chunks   = nil
+    layer.objects  = nil
+    layer.image    = nil
+
+    layer.draw = ->
+    layer.update = ->
+
+    layer
+
+  removeLayer: (idx) =>
+    layer = assert @layers[idx], "Layer not found: " .. idx
+
+    if type(idx) == "string"
+      for i, l in ipairs @layers
+        if l.name == idx
+          table.remove(@layers, i)
+          @layers[idx] = nil
+          break
+
+      name = @layers[idx].name
+      table.remove(@layers, idx)
+      @layers[name] = nil
+
+    if layer.batches
+	  	for _, batch in pairs(layer.batches)
+			  @freeBatchSprites[batch] = nil
+
+    if layer.chunks
+      for _, chunk in ipairs layer.chunks
+        for _, batch in pairs chunk.batches
+          @freeBatchSprites[batch] = nil
+
+    if layer.type == "tilelayer"
+      for _, tiles in pairs @tileInstances
+        for i = #tiles, 1, -1
+          tile = tiles[i]
+          if tile.layer == layer
+            table.remove(tiles, i)
+
+    if layer.objects
+      for i, object in pairs @objects
+        if object.layer == layer
+          @objects[i] = nil
+
+
+  getLayerProperties: (layer) =>
+    l = @layers[layer]
+
+    if not l
+      return {}
+
+    l.properties
+
+  getTileProperties: (layer, x, y) =>
+    tile = @layers[layer].data[y][x]
+
+    if not tile
+      return {}
+
+    tile.properties
+
+  swapTile: (instance, tile) =>
+
+    if instance.batch
+      if tile
+        instance.batch\set(
+          instance.id,
+          tile.quad,
+          instance.x,
+          instance.y,
+          tile.r,
+          tile.sx,
+          tile.sy
+        )
+      else
+        instance.batch\set(
+          instance.id,
+          instance.x,
+          instance.y,
+          0,
+          0)
+
+        @freeBatchSprites[instance.batch] = @freeBatchSprites[instance.batch] or {}
+        table.insert(@freeBatchSprites[instance.batch], instance)
+
+
+    for i, ins in ipairs(@tileInstances[instance.gid])
+      if ins.batch == instance.batch and ins.id == instance.id
+        table.remove(@tileInstances[instance.gid], i)
+        break
+
+    if tile
+      @tileInstances[tile.gid] = @tileInstances[tile.gid] or {}
+
+      freeBatchSprites = @freeBatchSprites[instance.batch]
+      local newInstance
+      if freeBatchSprites and #freeBatchSprites > 0 then
+        newInstance = freeBatchSprites[#freeBatchSprites]
+        freeBatchSprites[#freeBatchSprites] = nil
+      else
+        newInstance = {}
+
+      newInstance.layer = instance.layer
+      newInstance.batch = instance.batch
+      newInstance.id    = instance.id
+      newInstance.gid   = tile.gid or 0
+      newInstance.x     = instance.x
+      newInstance.y     = instance.y
+      newInstance.r     = tile.r or 0
+      newInstance.oy    = tile.r ~= 0 and tile.height or 0
+      table.insert(@tileInstances[tile.gid], newInstance)
+
+  setLayerTile: (layer, x, y, gid) =>
+    layer = @layers[layer]
+
+    layer.data[y] = layer.data[y] or {}
+    tile = layer.data[y][x]
+    local instance
+
+    if tile
+      tileX, tileY =  @getLayerTilePosition(layer, tile, x, y)
+      for _, inst in pairs @tileInstances[tile.gid]
+        if inst.x == tileX and inst.y == tileY
+          instance = inst
+          break
+
+    if tile == @tiles[gid]
+		  return
+
+    tile = @tiles[gid]
+
+    if instance
+      @swapTile instance, tile
+    else
+      @addNewLayerTile layer, tile, x, y
+
+    layer.data[y][x] = tile
+
+
+  convertTileToPixel: (x,y) =>
+
+
+
+
+
+
+
+
+
+
 
 
 Tiler
