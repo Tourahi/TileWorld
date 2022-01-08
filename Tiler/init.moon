@@ -1053,16 +1053,210 @@ class Tiler
 
 
   convertTileToPixel: (x,y) =>
+    ceil = math.ceil
+    if @orientation == "orthogonal"
+      tileW = @tilewidth
+      tileH = @tileheight
+      return x * tileW, y * tileH
+
+    elseif @orientation == "isometric"
+      mapH    = @height
+      tileW   = @tilewidth
+      tileH   = @tileheight
+      offsetX = mapH * tileW / 2
+      return (x - y) * tileW / 2 + offsetX, (x + y) * tileH / 2
+
+    elseif @orientation == "staggered" or @orientation     == "hexagonal"
+      tileW   = @tilewidth
+      tileH   = @tileheight
+      sideLen = @hexsidelength or 0
+
+      if @staggeraxis == "x"
+        return x * tileW, ceil(y) * (tileH + sideLen) + (ceil(y) % 2 == 0 and tileH or 0)
+      else
+        return ceil(x) * (tileW + sideLen) + (ceil(x) % 2 == 0 and tileW or 0), y * tileH
+
+  convertPixelToTile: (x, y) =>
+
+    floor = math.floor
+    ceil = math.ceil
+    if @orientation == "orthogonal"
+      tileW = @tilewidth
+      tileH = @tileheight
+      return x / tileW, y / tileH
+    elseif @orientation == "isometric"
+      mapH    = @height
+      tileW   = @tilewidth
+      tileH   = @tileheight
+      offsetX = mapH * tileW / 2
+      return y / tileH + (x - offsetX) / tileW, y / tileH - (x - offsetX) / tileW
+    elseif @orientation == "staggered"
+      staggerX = @staggeraxis  == "x"
+      even     = @staggerindex == "even"
+
+      topLeft = (x, y) ->
+        if staggerX
+          if ceil(x) % 2 == 1 and even
+            return x - 1, y
+          else
+            return x - 1, y - 1
+        else
+          if ceil(y) % 2 == 1 and even
+            return x, y - 1
+          else
+            return x - 1, y - 1
+
+      topRight = (x, y) ->
+        if staggerX then
+          if ceil(x) % 2 == 1 and even
+            return x + 1, y
+          else
+            return x + 1, y - 1
+        else
+          if ceil(y) % 2 == 1 and even
+            return x + 1, y - 1
+          else
+            return x, y - 1
+
+      bottomLeft = (x, y) ->
+        if staggerX then
+          if ceil(x) % 2 == 1 and even
+            return x - 1, y + 1
+          else
+            return x - 1, y
+        else
+          if ceil(y) % 2 == 1 and even
+            return x, y + 1
+          else
+            return x - 1, y + 1
 
 
+      bottomRight = (x, y) ->
+        if staggerX then
+          if ceil(x) % 2 == 1 and even
+            return x + 1, y + 1
+          else
+            return x + 1, y
+        else
+          if ceil(y) % 2 == 1 and even
+            return x + 1, y + 1
+          else
+            return x, y + 1
+
+      tileW = @tilewidth
+      tileH = @tileheight
+
+      if staggerX
+        x = x - (even and tileW / 2 or 0)
+      else
+        y = y - (even and tileH / 2 or 0)
+
+      halfH      = tileH / 2
+      ratio      = tileH / tileW
+      referenceX = ceil(x / tileW)
+      referenceY = ceil(y / tileH)
+      relativeX  = x - referenceX * tileW
+      relativeY  = y - referenceY * tileH
+
+      if (halfH - relativeX * ratio > relativeY)
+        return topLeft(referenceX, referenceY)
+      elseif (-halfH + relativeX * ratio > relativeY)
+        return topRight(referenceX, referenceY)
+      elseif (halfH + relativeX * ratio < relativeY)
+        return bottomLeft(referenceX, referenceY)
+      elseif (halfH * 3 - relativeX * ratio < relativeY)
+        return bottomRight(referenceX, referenceY)
+
+      return referenceX, referenceY
+    elseif @orientation == "hexagonal"
+      staggerX  = @staggeraxis  == "x"
+      even      = @staggerindex == "even"
+      tileW     = @tilewidth
+      tileH     = @tileheight
+      sideLenX  = 0
+      sideLenY  = 0
+
+      colW       = tileW / 2
+      rowH       = tileH / 2
+
+      if staggerX
+        sideLenX = @hexsidelength
+        x = x - (even and tileW or (tileW - sideLenX) / 2)
+        colW = colW - (colW  - sideLenX / 2) / 2
+      else
+        sideLenY = @hexsidelength
+        y = y - (even and tileH or (tileH - sideLenY) / 2)
+        rowH = rowH - (rowH  - sideLenY / 2) / 2
 
 
+      referenceX = ceil(x) / (colW * 2)
+      referenceY = ceil(y) / (rowH * 2)
+
+      -- If in staggered line, then shift reference by 0.5 of other axes
+      if staggerX then
+        if (floor(referenceX) % 2 == 0) == even
+          referenceY = referenceY - 0.5
+      else
+        if (floor(referenceY) % 2 == 0) == even
+          referenceX = referenceX - 0.5
+
+      relativeX  = x - referenceX * colW * 2
+      relativeY  = y - referenceY * rowH * 2
+      local centers
+
+      if staggerX
+        left    = sideLenX / 2
+        centerX = left + colW
+        centerY = tileH / 2
+
+        centers = {
+          { x: left,           y: centerY        },
+          { x: centerX,        y: centerY - rowH },
+          { x: centerX,        y: centerY + rowH },
+          { x: centerX + colW, y: centerY        },
+        }
+      else
+        top     = sideLenY / 2
+        centerX = tileW / 2
+        centerY = top + rowH
+
+        centers = {
+          { x: centerX,        y: top },
+          { x: centerX - colW, y: centerY },
+          { x: centerX + colW, y: centerY },
+          { x: centerX,        y: centerY + rowH }
+        }
 
 
+      nearest = 0
+      minDist = math.huge
 
+      len2 = (ax, ay) ->
+        return ax * ax + ay * ay
 
+      for i = 1, 4
+        dc = len2(centers[i].x - relativeX, centers[i].y - relativeY)
 
+        if dc < minDist
+          minDist = dc
+          nearest = i
 
+      offsetsStaggerX = {
+        { x: 1, y:  1 },
+        { x: 2, y:  0 },
+        { x: 2, y:  1 },
+        { x: 3, y:  1 },
+      }
 
+      offsetsStaggerY = {
+        { x:  1, y: 1 },
+        { x:  0, y: 2 },
+        { x:  1, y: 2 },
+        { x:  1, y: 3 },
+      }
+
+      offsets = staggerX and offsetsStaggerX or offsetsStaggerY
+
+      return referenceX + offsets[nearest].x, referenceY + offsets[nearest].y
 
 Tiler

@@ -52,6 +52,7 @@ with love
   .update = (dt) ->
     t\update dt
 
+
     if input\down "right"
       rec.x += 300 * dt
     if input\down "left"
