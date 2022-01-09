@@ -15,7 +15,6 @@ cwd = (...)\gsub('%.Tiler$', '') .. "."
 
 with love
   .load = ->
-    print cwd
     love.graphics.setDefaultFilter('nearest', 'nearest')
 
     export t = Tiler "tests/level2.lua"
