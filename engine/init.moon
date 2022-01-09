@@ -10,6 +10,6 @@ export Tiler = assert require PATH..".Tiler"
 export Camera = assert require PATH..".Camera"
 
 -- Love based lua modules
-export Log = assert require PATH..".external.log.log"
+export Log = assert require PATH..".external.Log.log"
 export MeowC = assert require PATH..".external.MeowCore"
 
