@@ -1,8 +1,7 @@
-Camera = assert require "Camera"
-Input = assert require "Input"
 Leak = assert require "Leak"
+assert require "engine"
 
-Tiler = assert require "Tiler"
+
 M = assert require 'moon'
 export Dump = M.p
 
